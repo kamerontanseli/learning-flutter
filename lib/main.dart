@@ -1,106 +1,168 @@
-// Copyright 2018 The Flutter team. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:english_words/english_words.dart';
 
-void main() => runApp(MyApp());
+const String _name = "Kameron";
 
-class RandomWordsState extends State<RandomWords> {
-  final _suggestions = <WordPair>[];
-  final _saved = Set<WordPair>();
-  final _biggerFont = const TextStyle(fontSize: 18.0);
+final ThemeData kIOSTheme = new ThemeData(
+  primarySwatch: Colors.orange,
+  primaryColor: Colors.grey[100],
+  primaryColorBrightness: Brightness.light,
+);
 
-  void _pushSaved () {
-    Navigator.of(context).push(
-        MaterialPageRoute<void>(
-          builder: (BuildContext context) {
-            final Iterable<ListTile> tiles = _saved.map((WordPair pair) {
-              return ListTile(
-                title: Text(pair.asPascalCase, style: _biggerFont)
-              );
-            });
+final ThemeData kDefaultTheme = new ThemeData(
+  primarySwatch: Colors.purple,
+  accentColor: Colors.orangeAccent[400],
+);
 
-            final List<Widget> divided = ListTile.divideTiles(
-              context: context,
-              tiles: tiles
-            ).toList();
+void main() {
+  runApp(new FriendlychatApp());
+}
 
-            return Scaffold(
-              appBar: AppBar(
-                title: Text('Your Favourited Names')
-              ),
-              body: ListView(children: divided)
-            );
-          }
-        )
+class FriendlychatApp extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    return new MaterialApp(
+      title: "Friendlychat",
+      theme: defaultTargetPlatform == TargetPlatform.iOS         //new
+        ? kIOSTheme                                              //new
+        : kDefaultTheme,
+      home: new ChatScreen(),
     );
   }
+}
 
-  Widget _buildRow (WordPair pair) {
-    final bool alreadySaved = _saved.contains(pair);
-    return ListTile(
-      title: Text(pair.asPascalCase, style: _biggerFont),
-      trailing: Icon(
-        alreadySaved ? Icons.favorite : Icons.favorite_border,
-        color: alreadySaved ? Colors.red : null,
+
+class ChatScreen extends StatefulWidget {
+  @override
+  State createState() => new ChatScreenState();
+}
+
+class ChatScreenState extends State<ChatScreen> with TickerProviderStateMixin {
+  final List<ChatMessage> _messages = <ChatMessage>[];
+  final TextEditingController _textController = new TextEditingController();
+  bool _isComposing = false;
+
+  @override
+  void dispose() {                           
+    for (ChatMessage message in _messages)   
+      message.animationController.dispose(); 
+    super.dispose();                         
+  } 
+
+  void _handleSubmitted (String text) {
+    _textController.clear();
+    setState(() {
+      _isComposing = false;
+    });
+    ChatMessage message = new ChatMessage(
+      text: text,
+      animationController: new AnimationController(
+        duration: new Duration(milliseconds: 700), 
+        vsync: this,                               
       ),
-      onTap: () {
-        setState(() {
-          if (alreadySaved) {
-            _saved.remove(pair);
-          } else {
-            _saved.add(pair);
-          }
-        });
-      },
-    );
+    );                                                             
+    setState(() {                                                  
+      _messages.insert(0, message);                                
+    });
+    message.animationController.forward();
   }
 
-  Widget _buildSuggestions () {
-    return ListView.builder(
-      padding: const EdgeInsets.all(16.0),
-      itemBuilder: (context, i) {
-        if (i.isOdd) return Divider();
-        final index = i ~/ 2;
-        if (index >= _suggestions.length) {
-          _suggestions.addAll(generateWordPairs().take(10));
-        }
-        return _buildRow(_suggestions[index]);
-      }
+  Widget _buildTextComposer() {
+    return new IconTheme(
+      data: new IconThemeData(color: Theme.of(context).accentColor),
+      child: new Container(
+        margin: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+        child: new Row(
+          children: <Widget>[
+            new Flexible(
+              child: new TextField(
+                controller: _textController,
+                onSubmitted: _handleSubmitted,
+                decoration: new InputDecoration.collapsed(hintText: "Send a message"),
+                onChanged: (String text) {
+                  setState(() {                    
+                    _isComposing = text.length > 0;
+                  });
+                },
+              )
+            ),
+            new Container(                                                 
+              margin: new EdgeInsets.symmetric(horizontal: 4.0),           
+              child: new IconButton(                                       
+                icon: new Icon(Icons.send),                                
+                onPressed: _isComposing ? () => _handleSubmitted(_textController.text) : null,
+              )  
+            ),
+          ]
+        ),
+      )
     );
   }
-  
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Text('Startup Name Generator'),
-        actions: <Widget>[
-          IconButton(icon: Icon(Icons.list), onPressed: _pushSaved)
+    return new Scaffold(
+      appBar: new AppBar(
+        title: new Text("Friendlychat"),
+        elevation: 4.0
+      ),
+      body: new Column(
+        children: <Widget>[
+          new Flexible(                                             
+            child: new ListView.builder(                             
+              padding: new EdgeInsets.all(8.0),                     
+              reverse: true,                                        
+              itemBuilder: (_, int index) => _messages[index],      
+              itemCount: _messages.length,                          
+            ),                                                      
+          ),                                                        
+          new Divider(height: 1.0),                                 
+          new Container(                                            
+            decoration: new BoxDecoration(
+              color: Theme.of(context).cardColor
+            ),                  
+            child: _buildTextComposer(),                       //modified
+          ),         
         ],
-      ),
-      body: _buildSuggestions()
+      )
     );
   }
 }
 
-class RandomWords extends StatefulWidget {
-  @override
-  RandomWordsState createState() => RandomWordsState();
-}
+class ChatMessage extends StatelessWidget {
+  ChatMessage({this.text, this.animationController});
+  final String text;
+  final AnimationController animationController;
 
-class MyApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Startup Name Generator',
-      theme: ThemeData(          // Add the 3 lines from here... 
-        primaryColor: Colors.amber,
+    return new SizeTransition(
+      sizeFactor: new CurvedAnimation(parent: animationController, curve: Curves.easeOut),
+      axisAlignment: 0.0,
+      child: new Container(
+        margin: const EdgeInsets.symmetric(vertical: 10.0),
+        child: new Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            new Container(
+              margin: EdgeInsets.only(right: 16.0),
+              child: new CircleAvatar(child: new Text(_name[0])),
+            ),
+            new Expanded(
+              child: new Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  new Text(_name, style: Theme.of(context).textTheme.subhead),
+                  new Container(
+                    margin: const EdgeInsets.only(top: 5.0),
+                    child: new Text(text),
+                  ),
+                ],
+              ),
+            )
+          ],
+        )
       ),
-      home: RandomWords()
     );
   }
 }
